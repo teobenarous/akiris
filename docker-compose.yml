@@ -1,0 +1,62 @@
+services:
+  simulator:
+    build:
+      context: .
+      dockerfile: simulator/Dockerfile
+    environment:
+      # If MESSAGE_DELAY is set, use it. Otherwise, default to 5 messages per second
+      - MESSAGE_DELAY=${MESSAGE_DELAY:-0.2}
+    container_name: akiris-simulator
+    volumes:
+      - ./data/sample:/data:ro
+    ports:
+      - "8440:8440" # MLLP
+      - "8441:8441" # Pager HTTP
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: akiris-app
+    depends_on:
+      - simulator
+    environment:
+      - MLLP_ADDRESS=simulator:8440
+      - PAGER_ADDRESS=simulator:8441
+      - PROMETHEUS_PORT=8000
+      - HISTORY_PATH=/data/history.csv
+      - PERSISTENCE_PATH=/state/patients.pkl
+      - JOURNAL_PATH=/state/journal.jsonl
+      - RECONNECT=${RECONNECT:-true}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data/sample:/data:ro
+      - ./state:/state
+    ports:
+      - "8000:8000" # Expose metrics locally
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: akiris-prometheus
+    volumes:
+      - ./k8s/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - app
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: akiris-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    depends_on:
+      - prometheus
+    volumes:
+      - ./k8s/grafana/provisioning:/etc/grafana/provisioning
+      - ./k8s/grafana/dashboards:/etc/grafana/dashboards
+      - grafana-data:/var/lib/grafana
+
+volumes:
+  grafana-data:

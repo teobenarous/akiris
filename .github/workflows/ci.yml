@@ -1,0 +1,84 @@
+name: AKIRIS CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        cache: "pip"
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run Engineering Test Suite
+      run: |
+        # Run tests with coverage report
+        PYTHONPATH=app pytest -v --cov=app tests/
+
+    - name: Extract Coverage Score and Update Badge
+      env:
+        GIST_SECRET: ${{ secrets.GIST_SECRET }}
+        GIST_ID: "99ee05d1ca0e80df5b5a808d87753670"
+      run: |
+        # 1. Extract the total coverage percentage from the pytest output table
+        COVERAGE=$(coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
+        echo "Current coverage is $COVERAGE%"
+        
+        # 2. Determine the color (Green > 90%, Yellow > 80%, Red otherwise)
+        if (( COVERAGE >= 90 )); then COLOR="brightgreen"; elif (( COVERAGE >= 80 )); then COLOR="yellow"; else COLOR="red"; fi
+        
+        # 3. Create the JSON payload that Shields.io expects
+        JSON_PAYLOAD=$(printf '{"schemaVersion": 1, "label": "Coverage", "message": "%s%%", "color": "%s", "namedLogo": "pytest"}' "$COVERAGE" "$COLOR")
+        
+        # 4. Push the update to your Gist using the GitHub API
+        curl -L \
+          -X PATCH \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer $GIST_SECRET" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          https://api.github.com/gists/$GIST_ID \
+          -d "{\"files\":{\"coverage.json\":{\"content\":$(echo "$JSON_PAYLOAD" | jq -R .)}}}"
+
+    - name: Smoke Test ML Training Pipeline
+      run: |
+        echo "Starting data generation..."
+        mkdir -p data/sample data/raw
+        
+        python -u scripts/generator/generator.py \
+          --output data/raw \
+          --days 10 \
+          --population_size 500 \
+          --history 10 \
+          --mean_daily_admits 15
+        
+        echo "Splitting dataset..."
+        python -u scripts/generator/split_train_test.py \
+          --input data/raw/dataset.csv \
+          --train-out data/train.csv \
+          --test-out data/test.csv
+        
+        echo "Training model..."
+        python -u model/train.py \
+          --train data/train.csv \
+          --test data/test.csv \
+          --model-out model/model.onnx \
+          --threshold-out model/threshold.txt
+          
+        echo "Pipeline test complete"
+
+    - name: Verify Docker Image Build
+      run: |
+        docker build -t akiris-engine:test .

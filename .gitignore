@@ -1,0 +1,29 @@
+# Python & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual Environments
+venv/
+env/
+.env
+
+# Data, Logs & State
+data/raw/
+logs/
+*.log
+state/
+
+# OS Artifacts
+.DS_Store
+Thumbs.db
+.idea/
+
+# EXCEPTIONS
+!data/assets/
+!data/sample/
+!model/model.onnx
+!model/threshold.txt

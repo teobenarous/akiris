@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: akiris-state-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: akiris-app
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: akiris-app
+  template:
+    metadata:
+      labels:
+        app: akiris-app
+    spec:
+      containers:
+      - name: akiris-app
+        image: akiris-app:local
+        imagePullPolicy: Never # Forces K8s to use your locally built image
+        command: ["python", "-m", "app.app"]
+        env:
+        # These now perfectly resolve to the simulator service defined above
+        - name: MLLP_ADDRESS
+          value: "akiris-simulator:8440"
+        - name: PAGER_ADDRESS
+          value: "akiris-simulator:8441"
+        - name: PROMETHEUS_PORT
+          value: "8000"
+        - name: HISTORY_PATH
+          value: "/data/history.csv"
+        - name: PERSISTENCE_PATH
+          value: "/state/patients.pkl"
+        - name: JOURNAL_PATH
+          value: "/state/journal.jsonl"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        ports:
+        - name: metrics
+          containerPort: 8000
+        volumeMounts:
+          - mountPath: "/state"
+            name: akiris-state
+          - mountPath: "/data"
+            name: sample-data
+            readOnly: true
+      volumes:
+      - name: akiris-state
+        persistentVolumeClaim:
+          claimName: akiris-state-pvc
+      - name: sample-data
+        hostPath:
+          path: /tmp/akiris/data/sample
+          type: DirectoryOrCreate

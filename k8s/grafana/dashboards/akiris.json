@@ -1,0 +1,208 @@
+{
+  "title": "AKIRIS Live Telemetry",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]
+  },
+  "refresh": "5s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Active Connections",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "targets": [ { "expr": "aki_active_connections" } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] } } }
+    },
+    {
+      "type": "stat",
+      "title": "MLLP Reconnects",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "targets": [ { "expr": "sum(aki_mllp_reconnects_total) or vector(0)" } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } } }
+    },
+    {
+      "type": "stat",
+      "title": "Messages Processed",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(aki_messages_received_total) by (message_type)",
+          "legendFormat": "{{message_type}}"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "name_value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "text" },
+          "mappings": [
+            { "type": "value", "options": {
+                "admit":      { "text": "Admissions" },
+                "blood_test": { "text": "Blood Tests" },
+                "discharge":  { "text": "Discharges" }
+            }}
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "AKI Alerts Detected",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "targets": [ { "expr": "sum(aki_predictions_total{result=\"positive\"}) or vector(0)" } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "#F46800" } } }
+    },
+    {
+      "type": "stat",
+      "title": "Pages Successfully Sent",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "targets": [ { "expr": "sum(aki_pager_requests_total{status=\"success\"}) or vector(0)" } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "#326CE5" } } }
+    },
+    {
+      "type": "timeseries",
+      "title": "End-to-End Latency (p90)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [ { "expr": "histogram_quantile(0.90, sum(rate(aki_e2e_latency_seconds_bucket[1m])) by (le))", "legendFormat": "p90 Latency" } ],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 15, "lineWidth": 2 }, "color": { "mode": "fixed", "fixedColor": "#73BF69" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "transparent", "value": null }, { "color": "red", "value": 0.05 } ] } } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Throughput by Message Type",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [ { "expr": "sum(rate(aki_messages_received_total[1m])) by (message_type)", "legendFormat": "{{message_type}}" } ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10, "lineWidth": 2 } } }
+    },
+    {
+      "type": "barchart",
+      "title": "Clinical Population: Creatinine Distribution (μmol/L)",
+      "gridPos": { "h": 9, "w": 16, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "expr": "round(sum(aki_blood_test_values_bucket) by (le))",
+          "format": "heatmap",
+          "instant": true,
+          "legendFormat": "{{le}}"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "renameByName": {
+              "Time": " ",
+              "50.0": "0-50",
+              "75.0": "51-75",
+              "100.0": "76-100",
+              "125.0": "101-125",
+              "150.0": "126-150",
+              "200.0": "151-200",
+              "300.0": "201-300",
+              "400.0": "301-400",
+              "+Inf": ">400"
+            }
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              { "targetField": " ", "destinationType": "string" }
+            ]
+          }
+        }
+      ],
+      "options": {
+        "xField": " ",
+        "orientation": "vertical",
+        "showValue": "always",
+        "barRadius": 0.2,
+        "groupWidth": 0.8,
+        "legend": { "show": true },
+        "tooltip": { "mode": "single" },
+        "xTickLabelRotation": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": { "mode": "fixed", "fixedColor": "green" },
+          "custom": {
+            "fillOpacity": 95,
+            "axisLabel": "Creatinine Range",
+            "axisColorMode": "text"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": " " },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*",
+                      "result": { "text": " " }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "126-150" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#EAB839" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "151-200" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "201-300" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "301-400" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": ">400" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "purple" } }]
+          }
+        ]
+      }
+    },
+    {
+      "type": "piechart",
+      "title": "Prediction Imbalance",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum(aki_predictions_total) by (result)",
+          "legendFormat": "{{result}}"
+        }
+      ],
+      "options": {
+        "pieType": "donut",
+        "displayLabels": [],
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "values": ["percent"]
+        }
+      }
+    }
+  ]
+}

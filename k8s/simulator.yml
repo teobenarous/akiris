@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: akiris-simulator
+  labels:
+    app: akiris-simulator
+spec:
+  selector:
+    app: akiris-simulator
+  ports:
+    - name: mllp
+      port: 8440
+      targetPort: 8440
+    - name: pager
+      port: 8441
+      targetPort: 8441
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: akiris-simulator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: akiris-simulator
+  template:
+    metadata:
+      labels:
+        app: akiris-simulator
+    spec:
+      containers:
+      - name: simulator
+        image: akiris-simulator:local
+        imagePullPolicy: Never # Forces K8s to use your locally built Docker image
+        ports:
+        - containerPort: 8440
+        - containerPort: 8441
+        volumeMounts:
+          - mountPath: "/data"
+            name: sample-data
+            readOnly: true
+      volumes:
+      - name: sample-data
+        hostPath:
+          path: /tmp/akiris/data/sample
+          type: DirectoryOrCreate
