@@ -26,7 +26,7 @@ AKIRIS operates as a decoupled streaming architecture, isolating the predictive 
 
 ```mermaid
 flowchart TD
-    %% Professional Styling Palette
+    %% Styling Palette
     classDef external fill:#f8f9fa,stroke:#adb5bd,stroke-width:2px,color:#495057,rx:5px,ry:5px,stroke-dasharray: 5 5
     classDef core fill:#ffffff,stroke:#228be6,stroke-width:2px,color:#212529,rx:5px,ry:5px
     classDef db fill:#f1f3f5,stroke:#ced4da,stroke-width:1px,color:#495057
@@ -51,7 +51,7 @@ flowchart TD
     Sim <--> |"HL7 Stream (in) / ACK (out)"| Gateway
     Gateway --> Parse
 
-    %% State Management Flow (Combined to prevent overlap)
+    %% State Management Flow
     Parse -- "Admissions & Results" --> Store
     Store <==> |"fsync (event) / replay (startup)"| WAL
     Store <--> |"save (periodic) / hydrate (startup)"| Snap
@@ -64,7 +64,7 @@ flowchart TD
     %% Outbound Flow
     Alert -- "HTTP POST" --> Pager
     
-    %% Full-Stack Telemetry Flow
+    %% Telemetry Flow
     Gateway -. "Connections & Throughput" .-> Prom
     Inf -. "Latency & Predictions" .-> Prom
 ```
@@ -83,7 +83,7 @@ flowchart TD
 
 -----
 
-## Clinical Performance (ML vs. Baseline)
+## Clinical Performance
 
 In live-streaming evaluations on an unseen 90-day cohort, AKIRIS was benchmarked against the standard rules-based NHS algorithm. By optimizing for the F3 score and utilizing KDIGO-compliant feature engineering, the ML engine achieved near-perfect classification.
 
@@ -116,7 +116,7 @@ pip install -r requirements.txt
 This pipeline builds two *completely independent* synthetic populations to ensure strict statistical partitioning between offline model training and real-time streaming evaluations.
 
 * **Offline Training Cohort:** Simulates **2 years (730 days)** of longitudinal hospital activity across a population of **25,000 patients** (averaging 20 daily admissions). This dataset is automatically partitioned into an 80/20 stratified train/test split.
-* **Live-Streaming Cohort:** Generates a completely isolated **90-day** continuous HL7v2 stream for a separate population of 25,000 patients, ensuring streaming metrics are not an artifact of data leakage or overfitting.
+* **Live-Streaming Cohort:** Generates a completely isolated **90-day** continuous HL7 stream for a separate population of 25,000 patients, ensuring streaming metrics are not an artifact of data leakage or overfitting.
 
 ```bash
 make all
@@ -152,7 +152,7 @@ docker-compose up --build -d
 
 ## Testing & Reliability
 
-AKIRIS maintains a rigorous testing suite. Because the system ingests streaming TCP sockets and manages volatile physiological state, the test suite heavily prioritizes fault injection, distributed systems recovery, and computational validations.
+AKIRIS maintains a comprehensive testing suite (94% coverage). Because the system ingests streaming TCP sockets and manages volatile physiological state, the test suite heavily prioritizes fault injection, distributed systems recovery, and computational validations.
 
 Execute the unified test pipeline:
 ```bash
@@ -164,10 +164,10 @@ bash scripts/run_tests.sh
 
 * **Network Resilience & TCP Framing:** Validates byte-by-byte TCP fragmentation (`chunk_size=1`), out-of-band garbage data rejection, OS-level TCP Keep-Alive configurations, and MLLP start/end block parsing. 
 * **Fault Tolerance & Circuit Breakers:** Simulates network disconnects during active streams to verify the application's connection retry loop. Enforces a 5-strike circuit breaker that triggers a clean `sys.exit(1)`, allowing Kubernetes to safely respawn the pod upon unrecoverable faults.
-* **State Durability & Disk Corruption:** Tests the Write-Ahead Log (WAL) under catastrophic conditions, including `os.fsync` disk-full errors, malformed JSONL journal entries, and corrupted `.pkl` snapshots. Ensures the `PatientStore` bypasses corrupt bytes and recovers all valid data without crashing.
+* **State Durability & Disk Corruption:** Tests the Write-Ahead Log (WAL) under catastrophic conditions, including `os.fsync` disk-full errors, malformed JSONL journal entries, and corrupted `.pkl` snapshots. Ensures the patient store bypasses corrupt bytes and recovers all valid data without crashing.
 * **External API Integration:** Mocks the HTTP Pager API to verify that `4xx` client errors are cleanly dropped, while `5xx` server errors or network timeouts trigger exactly three retries using exponential backoff.
 * **Clinical Feature Engineering:** Asserts that multi-day rolling KDIGO windows (48-hour and 7-day minimums), velocity, and volatility calculations strictly match expected clinical values. Verifies that extreme physiological outliers are securely clipped before entering the computation graph.
-* **Performance SLOs & Clinical Validation:** End-to-end integration tests enforce a strict less than 30ms latency boundary per HL7 message. Furthermore, the test suite evaluates the synthetic cohorts against the legacy NHS rules-based algorithm, guaranteeing the generated data is clinically realistic enough for the baseline to achieve an F3-score greater than 0.70.
+* **Performance SLOs & Clinical Validation:** End-to-end integration tests enforce a strict \< 30ms latency boundary per HL7 message. Furthermore, the test suite evaluates the synthetic cohorts against the legacy NHS rules-based algorithm, guaranteeing the generated data is clinically realistic enough for the baseline to achieve an F3-score greater than 0.70.
 
 -----
 
@@ -181,7 +181,7 @@ akiris/
 ├── model/                  # ML training pipeline and exported ONNX computation graph
 ├── scripts/                # Data generation, evaluation, and test orchestration
 ├── simulator/              # HL7/MLLP hospital streaming daemon
-├── state/                  # Durability layer (Write-Ahead Log and Pickle snapshots)
+├── state/                  # Durability layer (write-ahead log and snapshots)
 ├── tests/                  # Unit and integration test suite
 ├── docker-compose.yml      # Local observability showcase orchestration
 ├── Dockerfile              # Production multi-stage build for the inference engine
